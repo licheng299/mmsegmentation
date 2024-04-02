@@ -7,7 +7,7 @@ from mmseg.apis import inference_model, init_model, show_result_pyplot
 
 
 def main():
-    parser = ArgumentParser()
+    parser = ArgumentParser()  
     parser.add_argument('img', help='Image file')
     parser.add_argument('config', help='Config file')
     parser.add_argument('checkpoint', help='Checkpoint file')
