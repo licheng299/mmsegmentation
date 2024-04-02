@@ -1,7 +1,7 @@
 # dataset settings
 dataset_type = 'MyDataset'
 # data_root = 'data/VOCdevkit/VOC2012'
-data_root = '/root/autodl-tmp/VOCdevkit'
+data_root = '/root/autodl-fs/VOCdevkit'
 crop_size = (512, 512)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
