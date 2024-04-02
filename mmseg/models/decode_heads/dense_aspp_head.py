@@ -88,6 +88,8 @@ class DenseASPPHead(ASPPHead):
                 padding=1,
                 norm_cfg=self.norm_cfg,
                 act_cfg=self.act_cfg))
+        # 这个卷积和3，2，1的卷积核需要背下来，一个不改变分辨率，一个降低未原来一半
+        self.comp_conv = nn.Conv2d(in_channels=2432, out_channels=2560, kernel_size=3, stride=1, padding=1)
 
     def forward(self, inputs):
         """Forward function."""
@@ -101,9 +103,10 @@ class DenseASPPHead(ASPPHead):
         ]
         #输出主干特征
         # aspp_outs.extend(self.denseaspp(x))
-        aspp_outs.append(self.denseaspp(x))
-        aspp_outs = torch.cat(aspp_outs, dim=1)
-        output = self.bottleneck(aspp_outs)
+        aspp_outs.append(self.denseaspp(x)) # [4, 512, 16, 16] [4, 1920. 16, 16]
+        aspp_outs = torch.cat(aspp_outs, dim=1) # in:[4, 512, 16, 16] [4, 1920. 16, 16] ->out [4, 2432, 16, 16]
+        aspp_outs = self.comp_conv(aspp_outs)
+        output = self.bottleneck(aspp_outs) # in:[4, 2432, 16, 16] ->
         #输出浅层特征c1_out,
         if self.c1_bottleneck is not None:
             c1_output = self.c1_bottleneck(inputs[0])

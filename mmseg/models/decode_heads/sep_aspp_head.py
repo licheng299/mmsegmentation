@@ -87,8 +87,8 @@ class DepthwiseSeparableASPPHead(ASPPHead):
                 align_corners=self.align_corners)
         ]
         aspp_outs.extend(self.aspp_modules(x))
-        aspp_outs = torch.cat(aspp_outs, dim=1)
-        output = self.bottleneck(aspp_outs)
+        aspp_outs = torch.cat(aspp_outs, dim=1) # in:[4, 512, 16, 16] [4, 512, 16, 16] ->out[4, 2560, 16, 16]
+        output = self.bottleneck(aspp_outs) # in:[4, 2560, 16, 16] -> out：[4, 512, 16, 16]
         if self.c1_bottleneck is not None:
             c1_output = self.c1_bottleneck(inputs[0])
             output = resize(

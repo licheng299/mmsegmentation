@@ -40,12 +40,12 @@ model = dict(
         dropout_ratio=0.1,
         norm_cfg=norm_cfg,
         align_corners=False,
-        #loss_decode=[dict(type='Loss', loss_name='loss_ce', loss_weight=0.4),
-        #            dict(type='DiceLoss', loss_name='loss_dice', loss_weight=1.0)]),
-        loss_decode=dict(type='CrossEntropyLoss', 
-                        class_weight=[0.8553, 1.022, 1.018 ,1.028 ,1.096, 0.979]
-                        # class_weight=[0.1, 0.2, 0.1 ,0.2 ,0.3, 0.1])
-                        )),    
+        loss_decode=[dict(type='CrossEntropyLoss', loss_name='loss_ce', loss_weight=0.4),
+                   dict(type='DiceLoss', loss_name='loss_dice', loss_weight=1.0)]),
+        # loss_decode=dict(type='CrossEntropyLoss', 
+        #                 class_weight=[0.8553, 1.022, 1.018 ,1.028 ,1.096, 0.979]
+        #                 # class_weight=[0.1, 0.2, 0.1 ,0.2 ,0.3, 0.1])
+        #                 )),    
     # model training and testing settings
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
