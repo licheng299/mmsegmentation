@@ -1,7 +1,7 @@
 # dataset settings
 dataset_type = 'MyDataset'
 # data_root = 'data/VOCdevkit/VOC2012'
-data_root = '/root/autodl-fs/VOCdevkit'
+data_root = '/root/autodl-fs'
 crop_size = (512, 512)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -50,7 +50,7 @@ train_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(
             img_path='jpg', seg_map_path='png'),
-        ann_file='train.txt',
+        ann_file='/root/autodl-fs/jpg/train.txt',
         pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=1,
@@ -62,7 +62,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(
             img_path='jpg', seg_map_path='png'),
-        ann_file='val.txt',
+        ann_file='/root/autodl-fs/jpg/val.txt',
         pipeline=test_pipeline))
 test_dataloader = val_dataloader
 
