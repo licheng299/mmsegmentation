@@ -38,6 +38,7 @@ from .vpd_depth_head import VPDDepthHead
 from .dense_aspp_head import DenseASPPHead
 from .sp_aspp_head import SPASPPHead
 from .spgau_head import GAUSPASPPHead
+from .sa_spgau_head import sa_GAUSPASPPHead
 __all__ = [
     'FCNHead', 'PSPHead', 'ASPPHead', 'PSAHead', 'NLHead', 'GCHead', 'CCHead',
     'UPerHead', 'DepthwiseSeparableASPPHead', 'ANNHead', 'DAHead', 'OCRHead',
@@ -47,5 +48,5 @@ __all__ = [
     'SegformerHead', 'ISAHead', 'STDCHead', 'IterativeDecodeHead',
     'KernelUpdateHead', 'KernelUpdator', 'MaskFormerHead', 'Mask2FormerHead',
     'LightHamHead', 'PIDHead', 'DDRHead', 'VPDDepthHead', 'SideAdapterCLIPHead','DenseASPPHead',
-    'SPASPPHead','GAUSPASPPHead'
+    'SPASPPHead','GAUSPASPPHead','sa_GAUSPASPPHead'
 ]

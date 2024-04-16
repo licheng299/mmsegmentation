@@ -56,7 +56,7 @@ class GAUSPASPPHead(ASPPHead):
          #   norm_cfg=self.norm_cfg,
          #   act_cfg=self.act_cfg)
         self.aspp = ASPP(in_channels=self.in_channels, out_channels=256)
-        self.gau = GAU(512, 48)
+        self.gau = GAU(256, 48)
         #浅层特征边：1x1 conv通道数调整
         if c1_in_channels > 0:
             self.c1_bottleneck = ConvModule(
@@ -89,18 +89,11 @@ class GAUSPASPPHead(ASPPHead):
     def forward(self, inputs):
         """Forward function."""
         x = self._transform_inputs(inputs)
-        aspp_outs = [
-            resize(
-                self.image_pool(x),
-                size=x.size()[2:],
-                mode='bilinear',
-                align_corners=self.align_corners)
-        ]
+
         #输出主干特征
         # aspp_outs.extend(self.denseaspp(x))
-        aspp_outs.append(self.aspp(x)) # [4, 512, 16, 16] [4, 1920. 16, 16]
-        aspp_outs = torch.cat(aspp_outs, dim=1) # in:[4, 512, 16, 16] [4, 1920. 16, 16] ->out [4, 2432, 16, 16]
-        aspp_outs = self.comp_conv(aspp_outs)
+        aspp_outs = self.aspp(x)
+        
         output = self.bottleneck(aspp_outs) # in:[4, 2432, 16, 16] ->
         #输出浅层特征c1_out,
 
@@ -243,7 +236,7 @@ class GAU(nn.Module):
             self.bn_reduction = nn.BatchNorm2d(channels_low)
         self.relu = nn.ReLU(inplace=True)
         self.LeakyReLU = nn.LeakyReLU(inplace=True)
-        self.comp_conv = nn.Conv2d(in_channels=560, out_channels=512, kernel_size=3, stride=1, padding=1)
+        self.comp_conv = nn.Conv2d(in_channels=304, out_channels=256, kernel_size=3, stride=1, padding=1)
 
 
     def forward(self, fms_high, fms_low, fm_mask=None):

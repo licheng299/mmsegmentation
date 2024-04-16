@@ -33,7 +33,7 @@ model = dict(
         num_classes=6,
         in_channels=320,
         in_index=3,
-        channels=512,
+        channels=256,
         # dilations=(1, 12, 24, 36),
         c1_in_channels=24,
         c1_channels=48,
@@ -52,7 +52,7 @@ model = dict(
 
 
 # 设置工作路径，防止checkpoint被覆盖
-# load_from = None 加载预训练模型，默认不加载
+#load_from ='' #加载预训练模型，默认不加载
 
 optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0005) # 可能初始学习率太小，还没有预训练权重
 optim_wrapper = dict(type='OptimWrapper', optimizer=optimizer, clip_grad=None)
@@ -67,4 +67,4 @@ param_scheduler = [
         by_epoch=False)
 ]
 train_cfg = dict(type='IterBasedTrainLoop', max_iters=40000, val_interval=1000)# 50个iter就val能训练出啥
-work_dir = './work_dirs/mobilenetv2aspp+sp'
+work_dir = './work_dirs/ceshi-mobilenetv2aspp+sp+40000'

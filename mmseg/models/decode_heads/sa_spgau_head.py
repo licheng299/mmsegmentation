@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from mmseg.registry import MODELS
 from mmseg.models.utils import resize
 from mmseg.models.decode_heads.aspp_head import ASPPHead
-
+from torch.nn.parameter import Parameter
 
 # class DepthwiseSeparableASPPModule(ASPPModule):
 #     """Atrous Spatial Pyramid Pooling (ASPP) Module with depthwise separable
@@ -27,7 +27,7 @@ from mmseg.models.decode_heads.aspp_head import ASPPHead
 
 
 @MODELS.register_module()
-class SPASPPHead(ASPPHead):
+class sa_GAUSPASPPHead(ASPPHead):
     """Encoder-Decoder with Atrous Separable Convolution for Semantic Image
     Segmentation.
 
@@ -55,12 +55,8 @@ class SPASPPHead(ASPPHead):
          #  conv_cfg=self.conv_cfg,
          #   norm_cfg=self.norm_cfg,
          #   act_cfg=self.act_cfg)
-        self.aspp = ASPP(in_channels=self.in_channels, out_channels=256)
-        #self.aspp_modules = _DenseASPPBlock(
-        #    in_channels=self.in_channels,
-         #   inter_channels1=512,
-         #   inter_channels2=256,
-         #   )
+        self.aspp = SA_ASPP(in_channels=self.in_channels, out_channels=256)
+        self.gau = GAU(256, 48)
         #浅层特征边：1x1 conv通道数调整
         if c1_in_channels > 0:
             self.c1_bottleneck = ConvModule(
@@ -74,7 +70,7 @@ class SPASPPHead(ASPPHead):
             self.c1_bottleneck = None
         self.sep_bottleneck = nn.Sequential(
             DepthwiseSeparableConvModule(
-                self.channels + c1_channels,
+                c1_channels,
                 self.channels,
                 3,
                 padding=1,
@@ -92,26 +88,54 @@ class SPASPPHead(ASPPHead):
 
     def forward(self, inputs):
         """Forward function."""
+        
         x = self._transform_inputs(inputs)
-
-        #输出主干特征
+        # aspp_outs = [
+        #     resize(
+        #         self.image_pool(x),
+        #         size=x.size()[2:],
+        #         mode='bilinear',
+        #         align_corners=self.align_corners)
+        # ]
+        # #输出主干特征
+        # # aspp_outs.extend(self.denseaspp(x))
+        # #x = self.SA(x)
+        # aspp_outs.append(self.aspp(x)) # [4, 512, 16, 16] [4, 1920. 16, 16]
         aspp_outs = self.aspp(x)
+        # aspp_outs = torch.cat(aspp_outs, dim=1) # in:[4, 512, 16, 16] [4, 1920. 16, 16] ->out [4, 2432, 16, 16]
+        # aspp_outs = self.comp_conv(aspp_outs)
         output = self.bottleneck(aspp_outs) # in:[4, 2432, 16, 16] ->
         #输出浅层特征c1_out,
+
         if self.c1_bottleneck is not None:
             c1_output = self.c1_bottleneck(inputs[0])
-            #对主干特征上采样
             output = resize(
                 input=output,
                 size=c1_output.shape[2:],
                 mode='bilinear',
                 align_corners=self.align_corners)
-            #将浅层特征和主干特征cat
-            output = torch.cat([output, c1_output], dim=1)
+            output = self.gau(output, c1_output)
+        #     gfu = GlobalFeatureUpsample1(low_channels=48,out_channels=48)
+            # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            # c1_output = gfu(c1_output).to(device)
+            # self.conv1 = conv_block(512, 512, kernel_size=1, stride=1, padding=0, use_bn_act=True)
+            # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            # output = self.conv1(output).to(device)
+            #output = self.conv1(output)
+            # output = torch.cat([output, c1_output], dim=1)
+        #     #对主干特征上采样
+        #     output = resize(
+        #         input=output,
+        #         size=c1_output.shape[2:],
+        #         mode='bilinear',
+        #         align_corners=self.align_corners)
+        #     #将浅层特征和主干特征cat
+        #     output = torch.cat([output, c1_output], dim=1)
         output = self.sep_bottleneck(output)
-        #3x3卷积输出
+        # #3x3卷积输出
         output = self.cls_seg(output)
         return output
+
     
 class StripPooling(nn.Module):
     def __init__(self, in_channels, up_kwargs={'mode': 'bilinear', 'align_corners': True}):
@@ -142,9 +166,9 @@ class StripPooling(nn.Module):
         out = self.conv5(x4)
         return F.relu_(x + out)  # 将输出的特征与原始输入特征结合
 
-class ASPP(nn.Module):
+class SA_ASPP(nn.Module):
     def __init__(self, in_channels, out_channels, rate=1, bn_mom=0.1):
-        super(ASPP, self).__init__()
+        super(SA_ASPP, self).__init__()
         self.branch1 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 1, 1, padding=0, dilation=rate, bias=True),
             nn.BatchNorm2d(out_channels, momentum=bn_mom),
@@ -175,7 +199,7 @@ class ASPP(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.SP = StripPooling(320, up_kwargs={'mode': 'bilinear', 'align_corners': True})
-
+        self.SA = sa_layer(1920)
     def forward(self, x):
         [b, c, row, col] = x.size()
         # -----------------------------------------#
@@ -199,6 +223,128 @@ class ASPP(nn.Module):
         #   将五个分支的内容堆叠起来
         #   然后1x1卷积整合特征。
         # -----------------------------------------#
-        feature_cat = torch.cat([conv1x1, conv3x3_1, conv3x3_2, conv3x3_3, global_feature,x,x1], dim=1)
+        feature_cat = torch.cat([conv1x1, conv3x3_1, conv3x3_2, conv3x3_3,global_feature, x,x1], dim=1)
         # result = self.conv_cat(feature_cat)
+        feature_cat = self.SA(feature_cat)
         return feature_cat
+    
+class GAU(nn.Module):
+    def __init__(self, channels_high, channels_low, upsample=True):
+        super(GAU, self).__init__()
+        # Global Attention Upsample
+        self.upsample = upsample
+        self.conv3x3 = nn.Conv2d(channels_low, channels_low, kernel_size=3, padding=1, bias=False)
+        self.bn_low = nn.BatchNorm2d(channels_low)
+
+        self.conv1x1 = nn.Conv2d(channels_high, channels_low, kernel_size=1, padding=0, bias=False)
+        self.bn_high = nn.BatchNorm2d(channels_low)
+        self.conv = nn.Conv2d(channels_low, channels_low, kernel_size=1, padding=0, bias=False)
+        if upsample:
+            self.conv_upsample = nn.ConvTranspose2d(channels_high, channels_low, kernel_size=4, stride=2, padding=1, bias=False)
+            self.bn_upsample = nn.BatchNorm2d(channels_low)
+        else:
+            self.conv_reduction = nn.Conv2d(channels_high, channels_low, kernel_size=1, padding=0, bias=False)
+            self.bn_reduction = nn.BatchNorm2d(channels_low)
+        self.relu = nn.ReLU(inplace=True)
+        self.LeakyReLU = nn.LeakyReLU(inplace=True)
+        self.comp_conv = nn.Conv2d(in_channels=304, out_channels=256, kernel_size=3, stride=1, padding=1)
+
+
+    def forward(self, fms_high, fms_low, fm_mask=None):
+        """
+        Use the high level features with abundant catagory information to weight the low level features with pixel
+        localization information. In the meantime, we further use mask feature maps with catagory-specific information
+        to localize the mask position.
+        :param fms_high: Features of high level. Tensor.
+        :param fms_low: Features of low level.  Tensor.
+        :param fm_mask:
+        :return: fms_att_upsample
+        """
+        [b, c, h, w] = fms_high.size()
+
+        # fms_high_gp = nn.AvgPool2d(fms_high.shape[2:])(fms_high).view(len(fms_high), c, 1, 1)
+        # fms_high_gp = self.conv1x1(fms_high_gp)
+        # fms_high_gp = self.bn_high(fms_high_gp)
+        # fms_high_gp = self.relu(fms_high_gp)
+
+        # # fms_low_mask = torch.cat([fms_low, fm_mask], dim=1)
+        '''GAU模块'''
+        fms_low_mask = self.conv3x3(fms_low)
+        fms_cat=torch.cat((fms_low_mask,fms_high),dim=1)
+        fms_cat=nn.AvgPool2d(fms_cat.shape[2:])(fms_high).view(len(fms_cat), c, 1, 1)
+        fms_cat=self.conv1x1(fms_cat)
+        fms_cat=self.LeakyReLU(fms_cat)
+        fms_cat=self.conv(fms_cat)
+        fms_cat=torch.sigmoid(fms_cat)
+
+        # fms_low_mask = self.bn_low(fms_low_mask)
+
+        fms_att = fms_cat * fms_low_mask
+        if self.upsample:
+            # out = self.relu(
+                out1 = torch.cat((fms_att, fms_high),dim=1)
+                out1 = self.comp_conv(out1)
+                out1 = self.conv_upsample(out1)
+                
+                out3 = self.bn_upsample(out1)
+                out = self.relu(out3)
+                
+        else:
+            out = self.relu(
+                self.bn_reduction(self.conv_reduction(fms_high)) + fms_att)
+
+        return out
+
+class sa_layer(nn.Module):
+    """Constructs a Channel Spatial Group module.
+
+    Args:
+        k_size: Adaptive selection of kernel size
+    """
+
+    def __init__(self, channel, groups=64):
+        super(sa_layer, self).__init__()
+        self.groups = groups
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.cweight = Parameter(torch.zeros(1, channel // (2 * groups), 1, 1))
+        self.cbias = Parameter(torch.ones(1, channel // (2 * groups), 1, 1))
+        self.sweight = Parameter(torch.zeros(1, channel // (2 * groups), 1, 1))
+        self.sbias = Parameter(torch.ones(1, channel // (2 * groups), 1, 1))
+
+        self.sigmoid = nn.Sigmoid()
+        self.gn = nn.GroupNorm(channel // (2 * groups), channel // (2 * groups))
+
+    @staticmethod
+    def channel_shuffle(x, groups):
+        b, c, h, w = x.shape
+
+        x = x.reshape(b, groups, -1, h, w)
+        x = x.permute(0, 2, 1, 3, 4)
+
+        # flatten
+        x = x.reshape(b, -1, h, w)
+
+        return x
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+
+        x = x.reshape(b * self.groups, -1, h, w)
+        x_0, x_1 = x.chunk(2, dim=1)
+
+        # channel attention
+        xn = self.avg_pool(x_0)
+        xn = self.cweight * xn + self.cbias
+        xn = x_0 * self.sigmoid(xn)
+
+        # spatial attention
+        xs = self.gn(x_1)
+        xs = self.sweight * xs + self.sbias
+        xs = x_1 * self.sigmoid(xs)
+
+        # concatenate along channel axis
+        out = torch.cat([xn, xs], dim=1)
+        out = out.reshape(b, -1, h, w)
+
+        out = self.channel_shuffle(out, 2)
+        return out

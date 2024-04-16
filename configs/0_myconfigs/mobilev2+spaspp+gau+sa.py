@@ -29,7 +29,7 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=True)),
     decode_head=dict(
         #type='DepthwiseSeparableASPPHead',
-        type='GAUSPASPPHead',
+        type='sa_GAUSPASPPHead',
         num_classes=6,
         in_channels=320,
         in_index=3,
@@ -67,4 +67,4 @@ param_scheduler = [
         by_epoch=False)
 ]
 train_cfg = dict(type='IterBasedTrainLoop', max_iters=40000, val_interval=1000)# 50个iter就val能训练出啥
-work_dir = './work_dirs/mobilenetv2aspp+sp+gau'
+work_dir = './work_dirs/mobilenetv2aspp+sp+gau+sa'
